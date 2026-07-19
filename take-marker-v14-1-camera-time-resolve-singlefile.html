@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Take Marker v14.1 Camera Time + Resolve</title>
+<style>
+:root{--bg:#0f1012;--panel:#1b1c20;--panel2:#25262b;--text:#f7f7f8;--muted:#a8abb4;--border:#3b3d45;--good:#1f7a3a;--hero:#9a7400;--sync:#2458a8;--danger:#8a2626}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{padding:12px;padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+.hidden{display:none!important}.wrap{max-width:780px;margin:0 auto}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}.title{font-weight:800;font-size:18px}
+.timer{font-size:clamp(34px,12vw,76px);font-weight:900;text-align:center;line-height:1;margin:8px 0 12px}
+.sub{text-align:center;color:var(--muted);font-size:14px;margin-top:-4px;margin-bottom:8px}
+.cameraTime{text-align:center;color:#fff;font-size:20px;font-weight:800;margin-bottom:8px}
+.marker{width:100%;height:clamp(92px,21vh,150px);border:0;border-radius:22px;color:white;font-size:clamp(34px,10vw,64px);font-weight:900;margin:7px 0;box-shadow:0 2px 0 rgba(255,255,255,.12) inset;touch-action:manipulation}
+.good{background:var(--good)}.hero{background:var(--hero)}.sync{background:var(--sync)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.smallbtn{min-height:56px;border-radius:16px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:18px;font-weight:800;touch-action:manipulation}
+.danger{background:var(--danger)}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:12px;margin-top:10px}
+.lastgrid{display:grid;grid-template-columns:1.2fr 1fr;gap:8px;align-items:center}
+.label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px}
+.lastmain{font-size:24px;font-weight:900}.lasttime{font-size:22px;font-weight:900;text-align:right}.prev{color:var(--muted);font-size:15px;margin-top:6px}
+.toast{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.74);z-index:5;font-size:clamp(48px,16vw,110px);font-weight:1000;text-align:center;white-space:pre-line}
+.syncOverlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#fff;color:#000;z-index:10;text-align:center;padding:20px}
+.syncBox{width:100%}.syncTitle{font-size:clamp(58px,20vw,160px);font-weight:1000;line-height:.95}.syncRel{font-size:clamp(50px,17vw,140px);font-weight:1000;line-height:1.05;margin-top:18px}.syncClock{font-size:clamp(34px,11vw,90px);font-weight:900;margin-top:12px}.syncHint{font-size:clamp(18px,5vw,36px);font-weight:800;margin-top:24px;letter-spacing:.08em}
+input,select,textarea{width:100%;border-radius:12px;border:1px solid var(--border);background:#09090b;color:white;padding:12px;font-size:18px;margin:6px 0 12px}
+textarea{min-height:180px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+kbd{background:#0a0a0b;border:1px solid var(--border);border-radius:6px;padding:2px 6px}
+.note{color:var(--muted);line-height:1.45}
+@media (orientation:landscape) and (max-height:520px){
+ body{padding:8px}.timer{font-size:38px;margin:3px 0 6px}.cameraTime{font-size:15px;margin-bottom:4px}.marker{height:68px;font-size:34px;margin:4px 0;border-radius:16px}.smallbtn{min-height:42px;font-size:15px}.panel{padding:8px;margin-top:6px}.lastmain,.lasttime{font-size:18px}.prev{font-size:12px}
+ .syncTitle{font-size:70px}.syncRel{font-size:58px}.syncClock{font-size:38px}.syncHint{font-size:20px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<section id="screenMain">
+  <div class="top">
+    <div class="title" id="projectLabel">Take Marker</div>
+    <button class="smallbtn" style="width:110px" onclick="showSetup()">⚙️ Setup</button>
+  </div>
+
+  <div class="timer" id="timer">00:00:00</div>
+  <div class="cameraTime" id="cameraTimeLine">Camera Time: --:--:--</div>
+  <div class="sub" id="stateText">Bereit · START drücken</div>
+
+  <button class="marker good" onclick="addMarker('GOOD','👍')">👍 GOOD</button>
+  <button class="marker hero" onclick="addMarker('HERO','⭐')">⭐ HERO</button>
+  <button class="marker sync" onclick="addMarker('SYNC','🎬')">🎬 SYNC</button>
+
+  <div class="panel">
+    <div class="lastgrid">
+      <div>
+        <div class="label">Last Marker · Undo entfernt diesen Marker</div>
+        <div class="lastmain" id="lastMarker">Noch kein Marker</div>
+      </div>
+      <div class="lasttime" id="lastTime">—</div>
+    </div>
+    <div class="prev" id="prevMarker">Previous: —</div>
+  </div>
+
+  <div class="row">
+    <button class="smallbtn" id="startBtn" onclick="toggleStart()">▶ START</button>
+    <button class="smallbtn" onclick="undo()">↩ UNDO</button>
+  </div>
+</section>
+
+<section id="screenSetup" class="hidden">
+  <div class="top">
+    <div class="title">Setup & Export</div>
+    <button class="smallbtn" style="width:110px" onclick="showMain()">Fertig</button>
+  </div>
+
+  <div class="panel">
+    <div class="label">Project / Production</div>
+    <input id="projectName" value="NOS Documentary 2026" oninput="saveSettings()">
+
+    <div class="label">Camera / Marker Timezone</div>
+    <select id="cameraTz" onchange="saveSettings()">
+      <option value="Europe/Berlin" selected>Europe/Berlin — CET/CEST</option>
+      <option value="Europe/Lisbon">Europe/Lisbon</option>
+      <option value="Europe/London">Europe/London</option>
+      <option value="UTC">UTC</option>
+    </select>
+
+    <p class="note">
+      V14.1: Normal CSV + Resolve CSV. Resolve CSV nutzt CameraISOTimeWithOffset und ist kompatibel mit dem neuen Multicam-Clipmarker-Script.
+    </p>
+
+    <div class="label">Detected Device Timezone</div>
+    <input id="deviceTz" value="—" readonly>
+
+    <div class="label">Presenter / Tastatur Mapping</div>
+    <p class="note">
+      <kbd>ArrowRight</kbd> / <kbd>PageDown</kbd> = 👍 GOOD<br>
+      <kbd>ArrowLeft</kbd> / <kbd>PageUp</kbd> = ⭐ HERO<br>
+      🎬 SYNC und ↩ UNDO bleiben am Touchscreen.
+    </p>
+
+    <div class="label">Last Key</div>
+    <input id="lastKeySeen" value="—" readonly>
+  </div>
+
+  <div class="row">
+    <button class="smallbtn" onclick="downloadCsv()">Normal CSV</button>
+    <button class="smallbtn" onclick="downloadResolveCsv()">Resolve CSV</button>
+  </div>
+  <div class="row">
+    <button class="smallbtn" onclick="downloadTxt()">TXT Export</button>
+    <button class="smallbtn" onclick="copyResolveCsv()">Resolve CSV kopieren</button>
+  </div>
+  <div class="row">
+    <button class="smallbtn" onclick="copyCsv()">Normal CSV kopieren</button>
+    <button class="smallbtn danger" onclick="clearAll()">CLEAR ALL</button>
+  </div>
+
+  <div class="panel">
+    <div class="label">Marker Log</div>
+    <textarea id="logBox" readonly></textarea>
+  </div>
+</section>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+<div id="syncOverlay" class="syncOverlay hidden" onclick="hideSyncOverlay()">
+  <div class="syncBox">
+    <div class="syncTitle">🎬 SYNC</div>
+    <div class="syncRel" id="syncRel">00:00:00</div>
+    <div class="syncClock" id="syncClock">--:--:--</div>
+    <div class="syncHint" id="syncHint">CAMERA TIME</div>
+  </div>
+</div>
+
+<script>
+let running=false, runStartMs=null, accumulatedMs=0, markers=[];
+const $=id=>document.getElementById(id);
+let lastKeyAt=0;
+let syncTimer=null;
+
+function pad(n){return String(n).padStart(2,'0')}
+function fmt(ms){ms=Math.max(0,Math.floor(ms/1000));let h=Math.floor(ms/3600),m=Math.floor((ms%3600)/60),s=ms%60;return `${pad(h)}:${pad(m)}:${pad(s)}`}
+function elapsedMs(){return accumulatedMs + (running ? Date.now()-runStartMs : 0)}
+function rel(){return fmt(elapsedMs())}
+function getDeviceTimeZone(){try{return Intl.DateTimeFormat().resolvedOptions().timeZone || "Unknown"}catch(e){return "Unknown"}}
+
+function partsInZone(date, timeZone){
+  const fmt = new Intl.DateTimeFormat("en-GB", {timeZone, hour12:false, year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit", second:"2-digit"});
+  const parts = {};
+  fmt.formatToParts(date).forEach(p => { if(p.type !== "literal") parts[p.type]=p.value; });
+  return {year:parts.year, month:parts.month, day:parts.day, hour:parts.hour, minute:parts.minute, second:parts.second};
+}
+function zoneOffset(date, timeZone){
+  const p = partsInZone(date, timeZone);
+  const asUTC = Date.UTC(+p.year, +p.month-1, +p.day, +p.hour, +p.minute, +p.second);
+  const diffMin = Math.round((asUTC - date.getTime()) / 60000);
+  const sign = diffMin >= 0 ? "+" : "-";
+  const abs = Math.abs(diffMin);
+  return `${sign}${pad(Math.floor(abs/60))}:${pad(abs%60)}`;
+}
+function zonedDate(date, timeZone){const p=partsInZone(date,timeZone);return `${p.year}-${p.month}-${p.day}`}
+function zonedClock(date, timeZone){const p=partsInZone(date,timeZone);return `${p.hour}:${p.minute}:${p.second}`}
+function zonedIsoWithOffset(date, timeZone){const p=partsInZone(date,timeZone);return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}${zoneOffset(date,timeZone)}`}
+
+function localIsoWithOffset(d=new Date()){
+  const tz=-d.getTimezoneOffset(),sign=tz>=0?"+":"-",abs=Math.abs(tz);
+  const off=`${sign}${pad(Math.floor(abs/60))}:${pad(abs%60)}`;
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${off}`;
+}
+function localDate(d=new Date()){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}
+function localTime(d=new Date()){return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`}
+function currentCameraZone(){return $("cameraTz").value || "Europe/Berlin"}
+
+function load(){
+  const saved=localStorage.getItem("takeMarkerV14_1")||localStorage.getItem("takeMarkerV14")||localStorage.getItem("takeMarkerV13")||localStorage.getItem("takeMarkerV10")||localStorage.getItem("takeMarkerV9")||localStorage.getItem("takeMarkerV8");
+  if(saved){
+    try{
+      const o=JSON.parse(saved);
+      markers=(o.markers||[]).filter(m=>m.type!=="DISCARD");
+      $("projectName").value=o.project || o.name || "NOS Documentary 2026";
+      if(o.cameraTz) $("cameraTz").value=o.cameraTz;
+      running=!!o.running;
+      accumulatedMs=o.accumulatedMs || 0;
+      runStartMs=o.runStartMs || null;
+      if(running && !runStartMs) runStartMs=Date.now();
+    }catch(e){}
+  }
+  $("deviceTz").value=getDeviceTimeZone();
+  updateAll()
+}
+function save(){
+  localStorage.setItem("takeMarkerV14_1",JSON.stringify({project:$("projectName").value,cameraTz:$("cameraTz").value,running,runStartMs,accumulatedMs,markers}))
+}
+function saveSettings(){save();updateAll()}
+function tick(){
+  $("cameraTimeLine").textContent=`Camera Time: ${zonedClock(new Date(), currentCameraZone())} · ${currentCameraZone()}`;
+  if(running)$("timer").textContent=rel();
+  requestAnimationFrame(tick)
+}
+requestAnimationFrame(tick)
+
+function updateAll(){
+  $("projectLabel").textContent=$("projectName").value||"Take Marker";
+  $("timer").textContent=rel();
+  $("cameraTimeLine").textContent=`Camera Time: ${zonedClock(new Date(), currentCameraZone())} · ${currentCameraZone()}`;
+  $("stateText").textContent=running?"Logging läuft":"Pausiert · START drücken";
+  $("startBtn").textContent=running?"■ STOP":"▶ START";
+  const last=markers[markers.length-1],prev=markers[markers.length-2];
+  $("lastMarker").textContent=last?`${last.icon} ${last.type}`:"Noch kein Marker";
+  $("lastTime").textContent=last?`${last.cameraClock || last.clock || last.relative}`:"—";
+  $("prevMarker").textContent=prev?`Previous: ${prev.icon} ${prev.type} · ${prev.cameraClock || prev.clock}`:"Previous: —";
+  $("logBox").value=markers.map((m,i)=>`${i+1}. ${m.project}\t${m.cameraDate || m.localDate}\t${m.cameraClock || m.clock}\t${m.relative}\t${m.type}\t${m.cameraTz || ""}`).join("\n");
+}
+function toggleStart(){
+  if(!running){running=true;runStartMs=Date.now();flash("▶ START\nMarker bleiben erhalten")}
+  else{accumulatedMs=elapsedMs();running=false;runStartMs=null;flash("■ STOP\nMarker bleiben erhalten")}
+  save();updateAll()
+}
+function addMarker(type,icon){
+  if(!running){running=true;runStartMs=Date.now()}
+  const now=new Date();
+  const camTz=currentCameraZone();
+  const devTz=getDeviceTimeZone();
+  const m={project:$("projectName").value||"Project",type,icon,relative:rel(),utcIso:now.toISOString(),deviceTz:devTz,deviceDate:localDate(now),deviceClock:localTime(now),deviceIso:localIsoWithOffset(now),cameraTz:camTz,cameraDate:zonedDate(now,camTz),cameraClock:zonedClock(now,camTz),cameraIso:zonedIsoWithOffset(now,camTz)};
+  markers.push(m);save();updateAll();
+  if(type==="SYNC") showSyncOverlay(m); else flash(`${icon} ${type}\n${m.cameraClock}\n${m.cameraTz}`);
+  if(navigator.vibrate)navigator.vibrate(type==="HERO"?[60,40,60]:type==="SYNC"?[80,40,80]:45)
+}
+function undo(){
+  if(markers.length){const m=markers.pop();save();updateAll();flash(`UNDO\n${m.icon} ${m.type}`);if(navigator.vibrate)navigator.vibrate([30,30,30])}
+  else flash("UNDO\nkein Marker")
+}
+function flash(txt){const t=$("toast");t.textContent=txt;t.classList.remove("hidden");setTimeout(()=>t.classList.add("hidden"),900)}
+function showSyncOverlay(m){$("syncRel").textContent=m.relative;$("syncClock").textContent=m.cameraClock;$("syncHint").textContent=m.cameraTz;$("syncOverlay").classList.remove("hidden");clearTimeout(syncTimer);syncTimer=setTimeout(hideSyncOverlay,3000)}
+function hideSyncOverlay(){$("syncOverlay").classList.add("hidden");clearTimeout(syncTimer)}
+function showSetup(){updateAll();$("screenMain").classList.add("hidden");$("screenSetup").classList.remove("hidden")}
+function showMain(){$("screenSetup").classList.add("hidden");$("screenMain").classList.remove("hidden");updateAll()}
+
+function normalCsv(){
+  const header="Project,MarkerType,Icon,RelativeTime,UTCISOTime,CameraTimeZone,CameraDate,CameraClockTime,CameraISOTimeWithOffset,DeviceTimeZone,DeviceDate,DeviceClockTime,DeviceISOTimeWithOffset\n";
+  return header+markers.map(m=>[m.project,m.type,m.icon,m.relative,m.utcIso||"",m.cameraTz||"",m.cameraDate||m.localDate||"",m.cameraClock||m.clock||"",m.cameraIso||m.localIso||"",m.deviceTz||"",m.deviceDate||"",m.deviceClock||"",m.deviceIso||""].map(v=>`"${String(v).replaceAll('"','""')}"`).join(",")).join("\n");
+}
+function resolveCsv(){
+  const header="Project,MarkerType,CameraISOTimeWithOffset,CameraTimeZone,CameraDate,CameraClockTime,RelativeTime,Icon,Note\n";
+  return header+markers.map(m=>{
+    const note=`${m.icon} ${m.type} · ${m.cameraClock || ""} ${m.cameraTz || ""} · rel ${m.relative}`;
+    return [m.project,m.type,m.cameraIso||m.localIso||"",m.cameraTz||"",m.cameraDate||m.localDate||"",m.cameraClock||m.clock||"",m.relative,m.icon,note].map(v=>`"${String(v).replaceAll('"','""')}"`).join(",");
+  }).join("\n");
+}
+function download(name,content,type){const blob=new Blob([content],{type});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name;a.click();URL.revokeObjectURL(url)}
+function safeProject(){return ($("projectName").value||"Project").replace(/[^a-z0-9_-]+/gi,"_")}
+function exportPrefix(){
+  const d=new Date(), camTz=currentCameraZone();
+  return `${zonedDate(d,camTz)}_${zonedClock(d,camTz).replaceAll(":","").slice(0,4)}_${safeProject()}`;
+}
+function downloadCsv(){download(`${exportPrefix()}_markers.csv`,normalCsv(),"text/csv;charset=utf-8")}
+function downloadResolveCsv(){download(`${exportPrefix()}_resolve_markers.csv`,resolveCsv(),"text/csv;charset=utf-8")}
+function downloadTxt(){download(`${exportPrefix()}_markers.txt`,markers.map(m=>`${m.cameraDate} ${m.cameraClock} ${m.cameraTz}  ${m.relative}  ${m.icon} ${m.type}  ${m.project}`).join("\n"),"text/plain;charset=utf-8")}
+async function copyCsv(){try{await navigator.clipboard.writeText(normalCsv());flash("Normal CSV kopiert")}catch(e){flash("Kopieren blockiert")}}
+async function copyResolveCsv(){try{await navigator.clipboard.writeText(resolveCsv());flash("Resolve CSV kopiert")}catch(e){flash("Kopieren blockiert")}}
+function clearAll(){
+  if(confirm("Wirklich ALLE Marker löschen?")){
+    if(confirm("Sicher? Das kann nicht rückgängig gemacht werden.")){
+      markers=[];accumulatedMs=0;running=false;runStartMs=null;save();updateAll();flash("CLEAR ALL\nMarker gelöscht")
+    }
+  }
+}
+window.addEventListener("keydown",e=>{
+  if(e.repeat)return;
+  const now=Date.now();
+  if(now-lastKeyAt<180)return;
+  lastKeyAt=now;
+  const k=e.key,c=e.code;
+  $("lastKeySeen").value=`key=${k} · code=${c} · keyCode=${e.keyCode||e.which||""}`;
+  if(k==="ArrowRight"||k==="PageDown"||c==="ArrowRight"||c==="PageDown"){addMarker("GOOD","👍");e.preventDefault()}
+  else if(k==="ArrowLeft"||k==="PageUp"||c==="ArrowLeft"||c==="PageUp"){addMarker("HERO","⭐");e.preventDefault()}
+  else if(k==="s"||k==="S"){toggleStart();e.preventDefault()}
+  else if(k==="Escape"){hideSyncOverlay();e.preventDefault()}
+},{capture:true});
+load();
+</script>
+</body>
+</html>
